@@ -2,13 +2,18 @@
   "name": "gps",
   "version": "1.0.0",
   "description": "A client's project to read csv formatted file, re-format and transmit via udp",
-  "main": "app/udpClient.js",
+  "main": "trackersim.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Evans R.",
   "license": "ISC",
   "dependencies": {
+    "commander": "^2.9.0",
     "csv-stream": "^0.1.3"
-  }
+  },
+  "bin": {
+    "trackersim": "trackersim.js"
+  },
+  "preferGlobal": "true"
 }

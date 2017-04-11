@@ -147,7 +147,7 @@ module.exports = class Parser {
         gpgrmcArr = line.split(',');
 
         gpgrmcObj['type'] = gpgrmcArr[0];
-        gpgrmcObj['time'] = gpgrmcArr[1];
+        gpgrmcObj['time'] = gpgrmcArr[1];  //HHMMSS
         gpgrmcObj['validity'] = gpgrmcArr[2]; // Navigation receiver warning A = OK, V = warning
         gpgrmcObj['latitude'] = gpgrmcArr[3]; // Latitude 49 deg. 16.45 min North
         gpgrmcObj['northSouth'] = gpgrmcArr[4]; // Latitude 49 deg. 16.45 min North
