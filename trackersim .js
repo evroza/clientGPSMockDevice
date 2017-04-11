@@ -10,28 +10,31 @@ var Parser = require('./app/Parser.js');
 var program = require('commander');
 
 //Read in input args
-program
-    .version('0.0.1')
+program.version('0.0.1')
     .usage('[options] <NMEA_File IMEI ...>')
-    .option('-s, --server-ip', 'server_ip')
-    .option('-p, --server-port', 'server_port')
-    .option('-d, --start_date', 'start_date')
-    .option('-t, --start_time', 'loop')
-    .option('-l, --loop', 'start_time')
+    .option('-s, --server-ip', 'server_ip', /^(localhost|.)$/i, 'localhost')
+    .option('-p, --server-port <n>', 'server_port', parseInt)
+    .option('-d, --start-date', 'start_date')
+    .option('-t, --start-time <n>', 'Start time')
+    .option('-l, --loop <n>', 'Loop through the file', parseInt)
     .parse(process.argv);
 
 
 parser = new Parser();
 
-process.argv.forEach(function (val, index, array) {
-    //capture input args
+console.log(program);
 
-    console.log(array.slice(2));
+//This will be read from cms
+var interval = 2,
+    imeiInput = '863835027175251';
 
-});/*
 
-var PORT =  13370;
-var HOST = '127.0.0.1';
+console.log("initializing ....");
+
+
+const PORT =  13370;
+const HOST = '127.0.0.1';
+const LOOPING = true;
 
 var csvLines = [];
 var locArr = [];
@@ -58,17 +61,35 @@ lineReader.on('close', function () {
     // first create loc objects array
     createLoc(csvLines, locArr, parser);
 
-    for(let obj in locArr){
-        let message = `${locArr[obj].prefix1},${locArr[obj].prefix2},${locArr[obj].code},${locArr[obj].eventCode},${locArr[obj].latitude},${locArr[obj].longitude},${locArr[obj].dateTime},${locArr[obj].posStatus},${locArr[obj].numSats},${locArr[obj].gsmStrength},${locArr[obj].speed},${locArr[obj].direction},${locArr[obj].hdop},${locArr[obj].altitude},${locArr[obj].mileage},${locArr[obj].runTime},${locArr[obj].baseStationInfo},${locArr[obj].ioPortStatus},${locArr[obj].analogInputVal}\r\n`;
 
-        var client = dgram.createSocket('udp4');
-        client.send(message, 0, message.length, PORT, HOST, function(err, bytes) {
-            if (err) throw err;
-            console.log('UDP message sent to ' + HOST +':'+ PORT);
-            client.close();
-        });
+    //Send the packets in intervals
+        let lengthArr = locArr.length,
+            counter =0;
 
-    }
+
+        setInterval(function () {
+            if(counter <= lengthArr){
+                // In the case looping is enabled, then reset counter here
+                if(LOOPING === true && (counter == lengthArr)){
+                    // reset counter to loop
+                    counter = 0;
+                }
+                var client = dgram.createSocket('udp4');
+                let message = `${counter}, ${locArr[counter].prefix1},${locArr[counter].imei},${locArr[counter].code},${locArr[counter].eventCode},${locArr[counter].latitude},${locArr[counter].longitude},${locArr[counter].dateTime},${locArr[counter].posStatus},${locArr[counter].numSats},${locArr[counter].gsmStrength},${locArr[counter].speed},${locArr[counter].direction},${locArr[counter].hdop},${locArr[counter].altitude},${locArr[counter].mileage},${locArr[counter].runTime},${locArr[counter].baseStationInfo},${locArr[counter].ioPortStatus},${locArr[counter].analogInputVal}\r\n`;
+                client.send(message, 0, message.length, PORT, HOST, function(err, bytes) {
+                    if (err) throw err;
+                    console.log('UDP message sent to ' + HOST +':'+ PORT);
+                    client.close();
+                });
+            }
+
+            //increment counter
+            counter += 1;
+
+        }, interval*1000);
+
+
+
 
 });
 
@@ -119,7 +140,7 @@ function createLoc(inputArr, outputArr, parser) {
 
             locationObj = {
                 prefix1: prefix1Presets[Math.floor(Math.random() * prefix1Presets.length)],
-                prefix2: '863835027175251',
+                imei: imeiInput,
                 code: 'AAA',
                 eventCode: 34,
                 latitude: latitude,
@@ -150,20 +171,3 @@ function createLoc(inputArr, outputArr, parser) {
 
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-*/
