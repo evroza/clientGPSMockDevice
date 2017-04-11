@@ -6,16 +6,18 @@
 var dgram = require('dgram');
 var fs = require('fs');
 var csv = require('csv-stream');
-var Parser = require('./app/Parser.js');
+var schedule = require('node-schedule');
 var program = require('commander');
+var Parser = require('./app/Parser.js');
+
 
 //Read in input args
 program.version('0.0.1')
     .usage('[options] <NMEA_File IMEI ...>')
     .option('-s, --server-ip', 'server_ip', /^(localhost|.)$/i, 'localhost')
     .option('-p, --server-port <n>', 'server_port', parseInt)
-    .option('-d, --start-date', 'start_date')
-    .option('-t, --start-time <n>', 'Start time')
+    .option('-d, --start-date', 'start_date >> YYYYMMDD')
+    .option('-t, --start-time <n>', 'Start time >>  HHMMSS')
     .option('-l, --loop <n>', 'Loop through the file', parseInt)
     .parse(process.argv);
 
@@ -28,9 +30,39 @@ console.log(program);
 var interval = 2,
     imeiInput = '863835027175251';
 
+//Date format YYMMDD
+const START_DATE = null;
+//HHMMSS
+const START_TIME = null;
+
 
 console.log("initializing ....");
 
+//Check if start date/ time is set and schedule, otherwise just run immediately
+
+if(START_DATE || START_TIME){
+    // remember months are zero based thus jan is 0
+    var date = START_DATE ? new Date(START_DATE.slice(0,4), START_DATE.slice(4,6)-1, START_DATE.slice(6)) : new Date();
+
+    date = START_TIME ? date.setHours(START_TIME.slice(0,2), START_TIME.slice(2,4), START_TIME.slice(4,6)) : date;
+
+    //schedule
+    console.log('Script scheduled to start at: ' + date);
+
+    var j = schedule.scheduleJob(date, function(){
+        console.log('Execution Starting ...');
+        App();
+    });
+
+} else {
+    App();
+}
+
+
+
+
+
+function App() {
 
 const PORT =  13370;
 const HOST = '127.0.0.1';
@@ -171,3 +203,4 @@ function createLoc(inputArr, outputArr, parser) {
 
 }
 
+};
