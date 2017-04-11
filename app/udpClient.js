@@ -1,9 +1,11 @@
 /**
  * Created by Evans R. on 4/11/2017.
+ * Each positioning data is composed of three lines i.e GPGSA, GPRMC, $GPGGA
+ * Have to read the data 3 lines at a time and parse
  */
 var dgram = require('dgram');
 var fs = require('fs');
-var csv = require('csv');
+var csv = require('csv-stream');
 
 var PORT = 13370;
 var HOST = '127.0.0.1';
@@ -27,7 +29,7 @@ lineReader.on('close', function () {
     //file read actions
 //will transfer to separate class later
 
-    var gpsMessBuffer = new Buffer(csvLines);
+    // var gpsMessBuffer = new Buffer(csvLines);
 
     for(let line in csvLines){
         // gpsMessBuffer = line;
@@ -50,9 +52,6 @@ lineReader.on('close', function () {
 
 
 // Server transmit actions - should be in separate file
-
-// var message = new Buffer("I'll be sending you GPS coordinates in a bit!");
-
 
 
 

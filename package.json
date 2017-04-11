@@ -9,6 +9,6 @@
   "author": "Evans R.",
   "license": "ISC",
   "dependencies": {
-    "csv": "^1.1.1"
+    "csv-stream": "^0.1.3"
   }
 }
