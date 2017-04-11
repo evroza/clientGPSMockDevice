@@ -11,50 +11,57 @@ var program = require('commander');
 var Parser = require('./app/Parser.js');
 
 
-//Read in input args
+// READ ALL INPUT ARGS FIRST
 program.version('0.0.1')
     .usage('[options] <NMEA_File IMEI ...>')
-    .option('-s, --server-ip', 'server_ip', /^(localhost|.)$/i, 'localhost')
+    .option('-s, --server-ip <address>', 'Target server\'s Ip', /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/, '127.0.0.1')
     .option('-p, --server-port <n>', 'server_port', parseInt)
-    .option('-d, --start-date', 'start_date >> YYYYMMDD')
-    .option('-t, --start-time <n>', 'Start time >>  HHMMSS')
-    .option('-l, --loop <n>', 'Loop through the file', parseInt)
+    .option('-i, --interval_sec <n>', 'Interval to send cordinates to server', /\b\d+/, '10')
+    .option('-d, --start-date, <date>', 'start_date Format >> YYYYMMDD', /\b\d{8}/, 'currentDate')
+    .option('-t, --start-time <time>', 'start time Format >>  HHMMSS', /\b\d{6}/, 'startTime')
+    .option('-l, --loop', 'Loop through the file')
     .parse(process.argv);
 
+//interval_sec default 10
 
-parser = new Parser();
 
-console.log(program);
+//Note if not passed in default value is false or specified default in .option last arg
+const CONFIG = {
+    SERVER_IP: program.serverIp,
+    SERVER_PORT: program.serverPort,
+    START_DATE: (program.startDate == 'currentDate' || !program.startDate) ? null : program.startDate,
+    START_TIME: (program.startTime == 'startTime' || !program.startTime) ? null : program.startTime,
+    INTERVAL: program.interval_sec,
+    LOOP: program.loop || false,
+    FILE: program.args[0] ? program.args[0].replace(new RegExp("'", 'g'), "") : null,
+    IMEI: program.args[1] || null
+};
+var parser = new Parser();
 
-//This will be read from cms
-var interval = 2,
-    imeiInput = '863835027175251';
-
-//Date format YYMMDD
-const START_DATE = null;
-//HHMMSS
-const START_TIME = null;
 
 
 console.log("initializing ....");
 
 //Check if start date/ time is set and schedule, otherwise just run immediately
 
-if(START_DATE || START_TIME){
+if(CONFIG.START_DATE || CONFIG.START_TIME){
     // remember months are zero based thus jan is 0
-    var date = START_DATE ? new Date(START_DATE.slice(0,4), START_DATE.slice(4,6)-1, START_DATE.slice(6)) : new Date();
+    var date = CONFIG.START_DATE ? new Date(CONFIG.START_DATE.slice(0,4), CONFIG.START_DATE.slice(4,6)-1, CONFIG.START_DATE.slice(6)) : new Date();
 
-    date = START_TIME ? date.setHours(START_TIME.slice(0,2), START_TIME.slice(2,4), START_TIME.slice(4,6)) : date;
+    date = CONFIG.START_TIME ? date.setHours(CONFIG.START_TIME.slice(0,2), CONFIG.START_TIME.slice(2,4), CONFIG.START_TIME.slice(4,6)) : date;
 
     //schedule
     console.log('Script scheduled to start at: ' + date);
 
     var j = schedule.scheduleJob(date, function(){
-        console.log('Execution Starting ...');
+        console.log('Scheduled Execution Starting ...');
         App();
     });
 
 } else {
+    console.log('Script is scheduled to start immedietely');
+    console.log('Scheduled Execution Starting ...');
+
     App();
 }
 
@@ -64,66 +71,67 @@ if(START_DATE || START_TIME){
 
 function App() {
 
-const PORT =  13370;
-const HOST = '127.0.0.1';
-const LOOPING = true;
-
 var csvLines = [];
 var locArr = [];
 
 
-var lineReader = require('readline').createInterface({
-    input: require('fs').createReadStream('./testData/nmea.txt')
-});
-
-lineReader.on('line', function (line) {
-    console.log('Line from file:', line);
-
-    // add each line to our object array
-    csvLines.push(line);
-});
-
-lineReader.on('close', function () {
-
-    //file read actions
-//will transfer to separate class later
-
-    // var gpsMessBuffer = new Buffer(csvLines);
-
-    // first create loc objects array
-    createLoc(csvLines, locArr, parser);
 
 
-    //Send the packets in intervals
-        let lengthArr = locArr.length,
-            counter =0;
+var stats = fs.stat(CONFIG.FILE, function(err,stat){
+    if (stat && stat.isFile() ) {
+        var lineReader = require('readline').createInterface({
+            input: require('fs').createReadStream(CONFIG.FILE)
+        });
+
+        lineReader.on('line', function (line) {
+            // add each line to our object array
+            csvLines.push(line);
+        });
+
+        lineReader.on('close', function () {
+            // first create loc objects array
+            createLoc(csvLines, locArr, parser);
+            //Send the packets in intervals
+            let lengthArr = locArr.length,
+                counter =0;
 
 
-        setInterval(function () {
-            if(counter <= lengthArr){
-                // In the case looping is enabled, then reset counter here
-                if(LOOPING === true && (counter == lengthArr)){
-                    // reset counter to loop
-                    counter = 0;
+            let timer = setInterval(function () {
+                if(counter <= lengthArr){
+                    // In the case looping is enabled, then reset counter here
+                    if(CONFIG.LOOP === true && (counter === lengthArr)){
+                        // reset counter to loop
+                        counter = 0;
+                        console.log("Restarting transmit. End of file reached ... ");
+                    } else if(CONFIG.LOOP === false && counter === (lengthArr - 1)){
+                        //Stop at end of file
+                        console.log("Ending transmit. End of file reached ... ");
+                        clearInterval(timer);
+                    }
+                    var client = dgram.createSocket('udp4');
+                    let message = `${locArr[counter].prefix1},${locArr[counter].imei},${locArr[counter].code},${locArr[counter].eventCode},${locArr[counter].latitude},${locArr[counter].longitude},${locArr[counter].dateTime},${locArr[counter].posStatus},${locArr[counter].numSats},${locArr[counter].gsmStrength},${locArr[counter].speed},${locArr[counter].direction},${locArr[counter].hdop},${locArr[counter].altitude},${locArr[counter].mileage},${locArr[counter].runTime},${locArr[counter].baseStationInfo},${locArr[counter].ioPortStatus},${locArr[counter].analogInputVal}\r\n`;
+                    client.send(message, 0, message.length, CONFIG.SERVER_PORT, CONFIG.SERVER_IP, function(err, bytes) {
+                        if (err) throw err;
+                        console.log(message);
+                        client.close();
+                    });
                 }
-                var client = dgram.createSocket('udp4');
-                let message = `${counter}, ${locArr[counter].prefix1},${locArr[counter].imei},${locArr[counter].code},${locArr[counter].eventCode},${locArr[counter].latitude},${locArr[counter].longitude},${locArr[counter].dateTime},${locArr[counter].posStatus},${locArr[counter].numSats},${locArr[counter].gsmStrength},${locArr[counter].speed},${locArr[counter].direction},${locArr[counter].hdop},${locArr[counter].altitude},${locArr[counter].mileage},${locArr[counter].runTime},${locArr[counter].baseStationInfo},${locArr[counter].ioPortStatus},${locArr[counter].analogInputVal}\r\n`;
-                client.send(message, 0, message.length, PORT, HOST, function(err, bytes) {
-                    if (err) throw err;
-                    console.log('UDP message sent to ' + HOST +':'+ PORT);
-                    client.close();
-                });
-            }
 
-            //increment counter
-            counter += 1;
+                //increment counter
+                counter += 1;
 
-        }, interval*1000);
+            }, CONFIG.INTERVAL*1000);
 
 
 
 
+        });
+
+    } else {
+        console.error("The file you specified does not exist!");
+    }
 });
+
 
 
 function createLoc(inputArr, outputArr, parser) {
@@ -136,15 +144,16 @@ function createLoc(inputArr, outputArr, parser) {
     if (Math.floor(inputArr.length/3) !== (inputArr.length/3)){
         console.error('The input GPS File is incorrectly formatted, the parsing might not work correctly!');
     }
+    /*
+      Example data structure:
+         $GPGGA,025555.540,1847.047,N,09900.991,E,1,12,1.0,0.0,M,0.0,M,,*65
+         $GPGSA,A,3,01,02,03,04,05,06,07,08,09,10,11,12,1.0,1.0,1.0*30
+         $GPRMC,025555.540,A,1847.047,N,09900.991,E,038.9,177.1,030417,000.0,W*72
 
-    // $GPGGA,025555.540,1847.047,N,09900.991,E,1,12,1.0,0.0,M,0.0,M,,*65
-    // $GPGSA,A,3,01,02,03,04,05,06,07,08,09,10,11,12,1.0,1.0,1.0*30
-    // $GPRMC,025555.540,A,1847.047,N,09900.991,E,038.9,177.1,030417,000.0,W*72
+     */
 
 
     for(let i = 0; i<= len; i++){
-        console.log(i);
-
         //return array slice of gpgsa gpgrmc and gpgga
         // use i as offest in our input array
         let start = i
@@ -172,7 +181,7 @@ function createLoc(inputArr, outputArr, parser) {
 
             locationObj = {
                 prefix1: prefix1Presets[Math.floor(Math.random() * prefix1Presets.length)],
-                imei: imeiInput,
+                imei: CONFIG.IMEI,
                 code: 'AAA',
                 eventCode: 34,
                 latitude: latitude,
