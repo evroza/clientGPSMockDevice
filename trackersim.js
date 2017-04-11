@@ -15,7 +15,7 @@ var Parser = require('./app/Parser.js');
 program.version('0.0.1')
     .usage('[options] <NMEA_File IMEI ...>')
     .option('-s, --server-ip <address>', 'Target server\'s Ip', /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/, '127.0.0.1')
-    .option('-p, --server-port <n>', 'server_port', parseInt)
+    .option('-p, --server-port <n>', 'server_port', parseInt, '13370')
     .option('-i, --interval_sec <n>', 'Interval to send cordinates to server', /\b\d+/, '10')
     .option('-d, --start-date, <date>', 'start_date Format >> YYYYMMDD', /\b\d{8}/, 'currentDate')
     .option('-t, --start-time <time>', 'start time Format >>  HHMMSS', /\b\d{6}/, 'startTime')

@@ -14,7 +14,7 @@
     "node-schedule": "^1.2.1"
   },
   "bin": {
-    "trackersim": "trackersim.js"
+    "trackersim": "./trackersim.js"
   },
   "preferGlobal": "true"
 }
