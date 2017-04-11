@@ -1,0 +1,14 @@
+{
+  "name": "gps",
+  "version": "1.0.0",
+  "description": "A client's project to read csv formatted file, re-format and transmit via udp",
+  "main": "app/udpClient.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Evans R.",
+  "license": "ISC",
+  "dependencies": {
+    "csv": "^1.1.1"
+  }
+}
