@@ -32,7 +32,7 @@ module.exports = class Parser {
      17   = VDOP
      *
      */
-    gpgsa_parser(line) {
+    _gpgsa_parser(line) {
         // Splitting
         // Valid GPGSA line should have 17 elements
         let gpgsaObj = {};
@@ -84,7 +84,7 @@ module.exports = class Parser {
      *
      *
      */
-    gpgga_parser(line) {
+    _gpgga_parser(line) {
         // Splitting
         // Valid GPGGGA line should have 17 elements
         let gpggaObj = {};
@@ -138,7 +138,7 @@ module.exports = class Parser {
      *
      *
      */
-    gpgrmc_parser(line) {
+    _gprmc_parser(line) {
         // Splitting
         // Valid GPRMC line should have 12 elements
         let gpgrmcObj = {};
@@ -164,6 +164,106 @@ module.exports = class Parser {
         gpgrmcObj['latFormatted'] = `${gpgrmcObj['latitude']}, ${gpgrmcObj['northSouth']}`;
 
         return gpgrmcObj;
+
+    }
+
+    /**
+     * @input locSetArr an array of location sets composed of [$GPGGA line, $GPGSA line, $GPRMC line]
+     * @returns locObj array - an array of location objects
+     *
+     * This takes in an ARRAY of nmea lines and returnes an ARRAY of location objects
+     * NOTE: It works on the asumption that input file has recurring sets of three location attributes
+     *        i.e. [[$GPGGA line, $GPGSA line, $GPRMC line], ... [$GPGGA line_n, $GPGSA line_n, $GPRMC line_n]]
+     * The order of elements in each array is important.
+     * Will likely be revised in the future to be more intelligent rather than depending on line ordering format
+     *
+     * Sample expected input array format:
+     *  [
+     [  '$GPGGA,025555.540,1847.047,N,09900.991,E,1,12,1.0,0.0,M,0.0,M,,*65',
+     '$GPGSA,A,3,01,02,03,04,05,06,07,08,09,10,11,12,1.0,1.0,1.0*30',
+     '$GPRMC,025555.540,A,1847.047,N,09900.991,E,038.9,177.1,030417,000.0,W*72'
+     ],
+     [  '$GPGGA,025555.540,1847.047,N,09900.991,E,1,12,1.0,0.0,M,0.0,M,,*65',
+     '$GPGSA,A,3,01,02,03,04,05,06,07,08,09,10,11,12,1.0,1.0,1.0*30',
+     '$GPRMC,025555.540,A,1847.047,N,09900.991,E,038.9,177.1,030417,000.0,W*72'
+     ]
+     ]
+     */
+    getLocArr(inputArr, imei){
+        let outputArr = [];
+        let locationObj = {};
+        let locationArrTemp = [];
+        let len = Math.floor(inputArr.length/3);
+        // generate random values for prefix1 since not provided in input file. For test purposes only
+        let prefix1Presets = ['$$i163', '$$A163', '$$C163', '$$E163', '$$I163', '$$H163'];
+
+
+        if (Math.floor(inputArr.length/3) !== (inputArr.length/3)){
+            console.error('The input GPS File is incorrectly formatted, the parsing might not work correctly!');
+            throw new Error('FORMAT ERROR: The input file is incorrectly formatted. Lines incorrectly ordered or some info missing.');
+        } else {
+
+            for(let i = 0; i<= len; i++){
+                //return array slice of gpgsa gpgrmc and gpgga
+                locationArrTemp = inputArr.slice(i*3, i*3+3);
+                let autoMileage = 32910;
+
+                // deal with this slice:
+                for (let k = 0; k < locationArrTemp.length; k++){
+                    //Will build loc obj here
+                    let gpggaObj = this._gpgga_parser(locationArrTemp[0]);
+                    let gpgsaObj = this._gpgsa_parser(locationArrTemp[1]);
+                    let gpgrmcObj = this._gprmc_parser(locationArrTemp[2]);
+
+                    let hdop = gpgsaObj['hdop'] ? gpgsaObj['hdop'] : gpgsaObj['hdop'];
+
+                    let latitude = gpgrmcObj['latitude'] !== '' ? gpgrmcObj['latitude'] : gpggaObj['latitude'];
+                    let longitude = gpgrmcObj['longitude'] !== '' ? gpgrmcObj['longitude'] : gpggaObj['longitude'];
+
+                    let numSats = gpggaObj['numSatelites'] ? gpggaObj['numSatelites']: gpgsaObj['sats'].length;
+
+                    // Time format in
+                    //DDMMYY && HHMMSS
+                    let ds =gpgrmcObj['dateStamp'] , ts = gpgrmcObj['time'];
+                    let dateTime =  new Date('20' + ds.slice(4,6),ds.slice(2,4), ds.slice(0, 2),
+                        ts.slice(0,2), ts.slice(2, 4), ts.slice(4,6)).valueOf();
+
+                    //Increase mileage by 30 in every submission
+
+                    locationObj = {
+                        prefix1: prefix1Presets[Math.floor(Math.random() * prefix1Presets.length)],
+                        imei: imei,
+                        code: 'AAA',
+                        eventCode: 34,
+                        latitude: latitude,
+                        longitude: longitude,
+                        dateTime: dateTime,
+                        posStatus: gpgrmcObj['validity'],
+                        numSats: numSats,
+                        gsmStrength: Math.floor(Math.random() * 30),
+                        speed: gpgrmcObj['speedKnots'],
+                        direction: gpgrmcObj['trueCourse'],
+                        hdop: hdop,
+                        altitude: gpggaObj['altitude'] | 5,
+                        mileage: autoMileage,
+                        baseStationInfo: '520|15|2905|0087330F', //have switched pos with runtime
+                        runTime: '0001',
+                        ioPortStatus: '0000|0000|0000|018A|04B5', // have switched positions with unknown val
+                        unknownVal: '00000001',
+                        unknownVal2: 1,
+                        analogInputVal: '0000*9E' + gpggaObj['checkSum']
+
+                    };
+                    autoMileage += 30;
+
+                }
+
+
+                //will finally return location Object instead of array
+                outputArr.push(locationObj);
+
+            }
+        }
 
     }
 

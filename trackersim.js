@@ -7,7 +7,8 @@ const dgram = require('dgram');
 const csv = require('csv-stream');
 const schedule = require('node-schedule');
 const program = require('commander');
-const Parser = require('./app/Parser.js');
+const Parser = require('./app/Parser');
+const FileReader = require('./app/FileReader');
 
 
 // READ ALL INPUT ARGS FIRST
@@ -35,7 +36,9 @@ const CONFIG = {
     FILE: program.args[0] ? program.args[0].replace(new RegExp("'", 'g'), "") : null,
     IMEI: program.args[1] || null
 };
+
 var parser = new Parser();
+const reader = new FileReader(CONFIG.FILE)
 
 
 
@@ -58,7 +61,7 @@ if(CONFIG.START_DATE || CONFIG.START_TIME){
     });
 
 } else {
-    console.log('Script is scheduled to start immedietely');
+    console.log('Script is scheduled to start immediately');
     console.log('Scheduled Execution Starting ...');
 
     App();
@@ -70,150 +73,41 @@ if(CONFIG.START_DATE || CONFIG.START_TIME){
 
 function App() {
 
-var csvLines = [];
-var locArr = [];
+    var csvLines = reader.getLinesArr();
+    var locArr = [];
+
+    // first create loc objects array
+    locArr = createLoc(csvLines, CONFIG.IMEI);
+    //Send the packets in intervals
+    let lengthArr = locArr.length,
+        counter =0;
 
 
-
-
-var stats = fs.stat(CONFIG.FILE, function(err,stat){
-    if (stat && stat.isFile() ) {
-        var lineReader = require('readline').createInterface({
-            input: require('fs').createReadStream(CONFIG.FILE)
-        });
-
-        lineReader.on('line', function (line) {
-            // add each line to our object array
-            csvLines.push(line);
-        });
-
-        lineReader.on('close', function () {
-            // first create loc objects array
-            createLoc(csvLines, locArr, parser);
-            //Send the packets in intervals
-            let lengthArr = locArr.length,
-                counter =0;
-
-
-            let timer = setInterval(function () {
-                if(counter <= lengthArr){
-                    // In the case looping is enabled, then reset counter here
-                    if(CONFIG.LOOP === true && (counter === lengthArr)){
-                        // reset counter to loop
-                        counter = 0;
-                        console.log("Restarting transmit. End of file reached ... ");
-                    } else if(CONFIG.LOOP === false && counter === (lengthArr - 1)){
-                        //Stop at end of file
-                        console.log("Ending transmit. End of file reached ... ");
-                        clearInterval(timer);
-                    }
-                    var client = dgram.createSocket('udp4');
-                    let message = `${locArr[counter].prefix1},${locArr[counter].imei},${locArr[counter].code},${locArr[counter].eventCode},${locArr[counter].latitude},${locArr[counter].longitude},${locArr[counter].dateTime},${locArr[counter].posStatus},${locArr[counter].numSats},${locArr[counter].gsmStrength},${locArr[counter].speed},${locArr[counter].direction},${locArr[counter].hdop},${locArr[counter].altitude},${locArr[counter].mileage},${locArr[counter].baseStationInfo},${locArr[counter].runTime},${locArr[counter].ioPortStatus},${locArr[counter].unknownVal},,${locArr[counter].unknownVal2},${locArr[counter].analogInputVal}\r\n`;
-                    client.send(message, 0, message.length, CONFIG.SERVER_PORT, CONFIG.SERVER_IP, function(err, bytes) {
-                        if (err) throw err;
-                        console.log(message);
-                        client.close();
-                    });
-                }
-
-                //increment counter
-                counter += 1;
-
-            }, CONFIG.INTERVAL*1000);
-
-
-
-
-        });
-
-    } else {
-        console.error("The file you specified does not exist!");
-    }
-});
-
-
-
-function createLoc(inputArr, outputArr, parser) {
-    let locationObj = {};
-    let locationArrTemp = [];
-    let len = Math.floor(inputArr.length/3);
-    let prefix1Presets = ['$$i163', '$$A163', '$$C163', '$$E163', '$$I163', '$$H163'];
-
-
-    if (Math.floor(inputArr.length/3) !== (inputArr.length/3)){
-        console.error('The input GPS File is incorrectly formatted, the parsing might not work correctly!');
-    }
-    /*
-      Example data structure:
-         $GPGGA,025555.540,1847.047,N,09900.991,E,1,12,1.0,0.0,M,0.0,M,,*65
-         $GPGSA,A,3,01,02,03,04,05,06,07,08,09,10,11,12,1.0,1.0,1.0*30
-         $GPRMC,025555.540,A,1847.047,N,09900.991,E,038.9,177.1,030417,000.0,W*72
-
-     */
-
-
-    for(let i = 0; i<= len; i++){
-        //return array slice of gpgsa gpgrmc and gpgga
-        // use i as offest in our input array
-        let start = i
-        locationArrTemp = inputArr.slice(i*3, i*3+3);
-        let autoMileage = 32910;
-        // deal with this slice:
-        for (let k = 0; k < locationArrTemp.length; k++){
-            //Will build loc obj here
-            let gpggaObj = parser.gpgga_parser(locationArrTemp[0]);
-            let gpgsaObj = parser.gpgsa_parser(locationArrTemp[1]);
-            let gpgrmcObj = parser.gpgrmc_parser(locationArrTemp[2]);
-
-            let hdop = gpgsaObj['hdop'] ? gpgsaObj['hdop'] : gpgsaObj['hdop'];
-
-            let latitude = gpgrmcObj['latitude'] !== '' ? gpgrmcObj['latitude'] : gpggaObj['latitude'];
-            let longitude = gpgrmcObj['longitude'] !== '' ? gpgrmcObj['longitude'] : gpggaObj['longitude'];
-
-            let numSats = gpggaObj['numSatelites'] ? gpggaObj['numSatelites']: gpgsaObj['sats'].length;
-
-            // Time format in
-            //DDMMYY && HHMMSS
-            let ds =gpgrmcObj['dateStamp'] , ts = gpgrmcObj['time'];
-            let dateTime =  new Date('20' + ds.slice(4,6),ds.slice(2,4), ds.slice(0, 2),
-                                     ts.slice(0,2), ts.slice(2, 4), ts.slice(4,6)).valueOf();
-
-            //Increase mileage by 30 in every submission
-
-            locationObj = {
-                prefix1: prefix1Presets[Math.floor(Math.random() * prefix1Presets.length)],
-                imei: CONFIG.IMEI,
-                code: 'AAA',
-                eventCode: 34,
-                latitude: latitude,
-                longitude: longitude,
-                dateTime: dateTime,
-                posStatus: gpgrmcObj['validity'],
-                numSats: numSats,
-                gsmStrength: Math.floor(Math.random() * 30),
-                speed: gpgrmcObj['speedKnots'],
-                direction: gpgrmcObj['trueCourse'],
-                hdop: hdop,
-                altitude: gpggaObj['altitude'] | 5,
-                mileage: autoMileage,
-                baseStationInfo: '520|15|2905|0087330F', //have switched pos with runtime
-                runTime: '0001',
-                ioPortStatus: '0000|0000|0000|018A|04B5', // have switched positions with unknown val
-                unknownVal: '00000001',
-                unknownVal2: 1,
-                analogInputVal: '0000*9E' + gpggaObj['checkSum']
-
-            };
-            autoMileage += 30;
-
+    let timer = setInterval(function () {
+        if(counter <= lengthArr){
+            // In the case looping is enabled, then reset counter here
+            if(CONFIG.LOOP === true && (counter === lengthArr)){
+                // reset counter to loop
+                counter = 0;
+                console.log("Restarting transmit. End of file reached ... ");
+            } else if(CONFIG.LOOP === false && counter === (lengthArr - 1)){
+                //Stop at end of file
+                console.log("Ending transmit. End of file reached ... ");
+                clearInterval(timer);
+            }
+            var client = dgram.createSocket('udp4');
+            let message = `${locArr[counter].prefix1},${locArr[counter].imei},${locArr[counter].code},${locArr[counter].eventCode},${locArr[counter].latitude},${locArr[counter].longitude},${locArr[counter].dateTime},${locArr[counter].posStatus},${locArr[counter].numSats},${locArr[counter].gsmStrength},${locArr[counter].speed},${locArr[counter].direction},${locArr[counter].hdop},${locArr[counter].altitude},${locArr[counter].mileage},${locArr[counter].baseStationInfo},${locArr[counter].runTime},${locArr[counter].ioPortStatus},${locArr[counter].unknownVal},,${locArr[counter].unknownVal2},${locArr[counter].analogInputVal}\r\n`;
+            client.send(message, 0, message.length, CONFIG.SERVER_PORT, CONFIG.SERVER_IP, function(err, bytes) {
+                if (err) throw err;
+                console.log(message);
+                client.close();
+            });
         }
 
+        //increment counter
+        counter += 1;
 
-        //will finally return location Object instead of array
-        outputArr.push(locationObj);
+    }, CONFIG.INTERVAL*1000);
 
-    }
-
-}
 
 };
