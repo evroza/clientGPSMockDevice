@@ -3,12 +3,11 @@
  * Each positioning data is composed of three lines i.e GPGSA, GPRMC, $GPGGA
  * Have to read the data 3 lines at a time and parse
  */
-var dgram = require('dgram');
-var fs = require('fs');
-var csv = require('csv-stream');
-var schedule = require('node-schedule');
-var program = require('commander');
-var Parser = require('./app/Parser.js');
+const dgram = require('dgram');
+const csv = require('csv-stream');
+const schedule = require('node-schedule');
+const program = require('commander');
+const Parser = require('./app/Parser.js');
 
 
 // READ ALL INPUT ARGS FIRST
