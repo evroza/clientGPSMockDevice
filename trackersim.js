@@ -66,8 +66,8 @@ if(CONFIG.START_DATE || CONFIG.START_TIME){
 
     reader.then((instance) => {
         return instance.getLinesArr();
-    }).then((csvLines) => {
-        App(csvLines);
+    }).then((lines) => {
+        App(lines);
     });
 
 
@@ -77,12 +77,12 @@ if(CONFIG.START_DATE || CONFIG.START_TIME){
 
 
 
-function App(csvLines) {
+function App(lines) {
 
     var locArr = [];
 
     // first create loc objects array
-    locArr = parser.getLocArr(csvLines, CONFIG.IMEI);
+    locArr = parser.getLocArr(lines, CONFIG.IMEI);
     //Send the packets in intervals
     let lengthArr = locArr.length,
         counter =0;
