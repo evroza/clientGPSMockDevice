@@ -265,6 +265,8 @@ module.exports = class Parser {
             }
         }
 
+        return outputArr;
+
     }
 
 

@@ -38,7 +38,7 @@ const CONFIG = {
 };
 
 var parser = new Parser();
-const reader = new FileReader(CONFIG.FILE)
+var reader = new FileReader(CONFIG.FILE);
 
 
 
@@ -64,20 +64,25 @@ if(CONFIG.START_DATE || CONFIG.START_TIME){
     console.log('Script is scheduled to start immediately');
     console.log('Scheduled Execution Starting ...');
 
-    App();
+    reader.then((instance) => {
+        return instance.getLinesArr();
+    }).then((csvLines) => {
+        App(csvLines);
+    });
+
+
 }
 
 
 
 
 
-function App() {
+function App(csvLines) {
 
-    var csvLines = reader.getLinesArr();
     var locArr = [];
 
     // first create loc objects array
-    locArr = createLoc(csvLines, CONFIG.IMEI);
+    locArr = parser.getLocArr(csvLines, CONFIG.IMEI);
     //Send the packets in intervals
     let lengthArr = locArr.length,
         counter =0;
