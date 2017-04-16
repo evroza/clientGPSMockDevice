@@ -5,30 +5,30 @@
 const fs = require('fs');
 
 module.exports = class FileReader {
-        /*
-            Attempts to resolve file and throws error if file not found
-         */
-         constructor(inputFile){
-             // Try resolving file
-             var that;
-             this.fileName = inputFile;
-             that = this;
+    /*
+        Attempts to resolve file and throws error if file not found
+     */
+     constructor(inputFile){
+         // Try resolving file
+         var that;
+         this.fileName = inputFile;
+         that = this;
 
-             return new Promise((resolve) => {
-                 let stats = fs.stat(inputFile, function(err,stat){
-                     if (stat && stat.isFile() ){
-                         that.fileName = inputFile;
-                         resolve(that);
-                     } else {
-                         // File doesn't exist
-                         console.error("The file you specified does not exist!");
-                         throw new Error('FILE READ ERROR: File not found!');
-                     }
-                 });
+         return new Promise((resolve) => {
+             let stats = fs.stat(inputFile, function(err,stat){
+                 if (stat && stat.isFile() ){
+                     that.fileName = inputFile;
+                     resolve(that);
+                 } else {
+                     // File doesn't exist
+                     console.error("The file you specified does not exist!");
+                     throw new Error('FILE READ ERROR: File not found!');
+                 }
              });
+         });
 
 
-        }
+    }
 
     /**
      * Returns an array of lines
@@ -60,9 +60,8 @@ module.exports = class FileReader {
 
             }
         });
-
-
-
-
     }
+
+
+
 };

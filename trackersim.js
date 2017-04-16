@@ -3,12 +3,12 @@
  * Each positioning data is composed of three lines i.e GPGSA, GPRMC, $GPGGA
  * Have to read the data 3 lines at a time and parse
  */
-const dgram = require('dgram');
 const csv = require('csv-stream');
 const schedule = require('node-schedule');
 const program = require('commander');
 const Parser = require('./app/Parser');
 const FileReader = require('./app/FileReader');
+const SocketClient = require('./app/SocketClient');
 
 
 // READ ALL INPUT ARGS FIRST
@@ -39,6 +39,7 @@ const CONFIG = {
 
 var parser = new Parser();
 var reader = new FileReader(CONFIG.FILE);
+var socketClient = new SocketClient(CONFIG);
 
 
 
@@ -100,13 +101,10 @@ function App(lines) {
                 console.log("Ending transmit. End of file reached ... ");
                 clearInterval(timer);
             }
-            var client = dgram.createSocket('udp4');
+
             let message = `${locArr[counter].prefix1},${locArr[counter].imei},${locArr[counter].code},${locArr[counter].eventCode},${locArr[counter].latitude},${locArr[counter].longitude},${locArr[counter].dateTime},${locArr[counter].posStatus},${locArr[counter].numSats},${locArr[counter].gsmStrength},${locArr[counter].speed},${locArr[counter].direction},${locArr[counter].hdop},${locArr[counter].altitude},${locArr[counter].mileage},${locArr[counter].baseStationInfo},${locArr[counter].runTime},${locArr[counter].ioPortStatus},${locArr[counter].unknownVal},,${locArr[counter].unknownVal2},${locArr[counter].analogInputVal}\r\n`;
-            client.send(message, 0, message.length, CONFIG.SERVER_PORT, CONFIG.SERVER_IP, function(err, bytes) {
-                if (err) throw err;
-                console.log(message);
-                client.close();
-            });
+
+            socketClient.udpTransmit( {message} );
         }
 
         //increment counter
